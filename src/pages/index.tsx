@@ -2,7 +2,7 @@ import { db } from "@/lib/firebase";
 import localFont from "next/font/local";
 import { useSwipeable } from 'react-swipeable';
 import { ChangeEvent, FormEvent, ReactNode, useEffect, useState } from "react";
-import { collection, doc, onSnapshot, setDoc } from "firebase/firestore";
+import { collection, doc, getDoc, onSnapshot, setDoc, Timestamp } from "firebase/firestore";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -23,6 +23,7 @@ interface TicketType {
   buyer: string;
   paid: boolean;
   phone: string;
+  buyAt: Timestamp;
 }
 
 interface TicketDto {
@@ -35,14 +36,15 @@ interface TicketDto {
 export default function Home() {
   const [loading, setLoading] = useState<boolean>(true);
   const [soldTickets, setSoldTickets] = useState<Array<number>>([]);
-  const [tickets, setTickets] = useState<Map<string, TicketType>>(new Map())
+  const [tickets, setTickets] = useState<Map<string, TicketType>>(new Map());
   const boletos = Array.from({ length: 100 }, (_, i) => i);
   const [isShowSideBar, showSideBar] = useState(false);
+  const [isShowItemDetails, setShowItemDetails] = useState(false);
+  const [selectedItem, selectItem] = useState<TicketType>();
 
   const handlers = useSwipeable({
     onSwipedLeft: () => showSideBar(false),
     onSwipedRight: () => showSideBar(true),
-    preventDefaultTouchmoveEvent: true,
     trackMouse: true,
   });
 
@@ -63,6 +65,16 @@ export default function Home() {
     return unsub;
   }, [loading])
 
+  function handleItemDetails(index: number) {
+    const ticket = tickets.get(index.toString());
+    
+
+    if(ticket) {
+      selectItem(ticket);
+      setShowItemDetails(true);
+    }
+  }
+
   if(loading) {
     return (
       <div className="absolute min-h-screen w-full flex flex-col justify-center items-center">
@@ -81,7 +93,7 @@ export default function Home() {
       <div className="rounded-md border-4 border-[#fdf1b0]">
         <section className="flex justify-center flex-wrap gap-2 rounded-md p-2 border-4 border-[#6a012c] bg-[#fdf1b0]">
           {boletos.map((number) => {
-            return <Item sold={soldTickets.includes(number)} key={number}>{number}</Item>
+            return <Item sold={soldTickets.includes(number)} key={number} onClick={() => handleItemDetails(number)}>{number}</Item>
           })}
         </section>
       </div>
@@ -91,13 +103,37 @@ export default function Home() {
         </article>
         <h3 className="flex flex-col justify-center items-center text-white text-sm drop-shadow-md bg-[#ffffff4b] px-4 rounded">Vendidos: {soldTickets.length} | Restantes: {100 - soldTickets.length}</h3>
       </div>
+
+      <ItemDetails open={isShowItemDetails} item={selectedItem} onClickClose={() => setShowItemDetails(false)} />
     </main>
   );
 }
 
-function Item({ sold, children }: { sold?: boolean, children: ReactNode }) {
+function ItemDetails({ open, item, onClickClose }: { open: boolean, item?: TicketType, onClickClose?: () => void }) {
+  if(!item) {
+    return <></>
+  }
+
   return (
-    <div className="flex flex-col justify-center items-center w-[30px] h-[30px] p-2 border-2 border-[#6a012c] rounded-full text-[#6a012c] font-bold">
+    <div
+      className={`fixed p-4 bottom-0 left-0 w-full h-[50%] bg-[#6a012c] text-white transition-transform duration-300 ease-in-out z-50 ${open ? 'transform translate-y-0' : 'transform translate-y-full'
+        }`}
+    >
+      <div className="flex flex-col justify-between h-full">
+        <div className="flex flex-col text-center text-xl md:text-3xl">
+          <span>Comprado por: {item.buyer}</span>
+          <span>N. Tlf: {item.phone || 'Sin registrar'}</span>
+          <span>Pagado: {item.paid ? 'Si' : 'No'}</span>
+        </div>
+        <button type='button' onClick={onClickClose}>Cerrar</button>
+      </div>
+    </div>
+  )
+}
+
+function Item({ sold, children, onClick }: { sold?: boolean, children?: ReactNode, onClick?: () => void }) {
+  return (
+    <div className="flex flex-col justify-center items-center w-[30px] h-[30px] p-2 border-2 border-[#6a012c] rounded-full text-[#6a012c] font-bold" onClick={onClick}>
       <div className="relative flex flex-col justify-center items-center">
         {sold && <span className="absolute bg-red-500 w-[20px] h-[20px] rounded-full opacity-80" />}
         {children}
@@ -107,19 +143,35 @@ function Item({ sold, children }: { sold?: boolean, children: ReactNode }) {
 }
 
 const Sidebar = ({ open, children }: { open: boolean, children?: ReactNode }) => {
+  const [loading, setLoading] = useState<boolean>(false);
   const [formData, setFormData] = useState<TicketDto>({ id: '', buyer: '', phone: ''})
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+
+    setLoading(true);
+
     const docRef = doc(db, COLLECTION_NAME, formData.id);
+
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      toast.error(`El numero: ${formData.id} ya pertenece a: ${docSnap.data().buyer}`, {
+        toastId: "ticketAdded"
+      });
+      setLoading(false);
+      return;
+    }
     
     await setDoc(docRef, {
       buyer: formData.buyer,
       phone: formData.phone,
-      paid: false
+      paid: false,
+      buyAt: Timestamp.now(),
     })
 
-    toast.success(`Numero registrado ${formData.id} a: ${formData.buyer}`, {
+    setLoading(false);
+
+    toast.success(`Numero: ${formData.id} registrado a: ${formData.buyer}`, {
       toastId: "ticketAdded"
     });
   }
@@ -129,7 +181,6 @@ const Sidebar = ({ open, children }: { open: boolean, children?: ReactNode }) =>
       console.error('El Input debe tener la propiedad name referenciada al objeto dto!');
       throw new Error("El Input debe tener la propiedad name referenciada al objeto dto!");
     }
-
     const dataCopy = formData as any;
     dataCopy[e.target.name] = e.target.value;
     setFormData(dataCopy);
@@ -158,8 +209,8 @@ const Sidebar = ({ open, children }: { open: boolean, children?: ReactNode }) =>
               <input type="text" maxLength={11} placeholder="Ej: 04141234567" name="phone" onChange={handleOnChangeInput} />
             </div>
             <div className="flex flex-row justify-between">
-              <button type="reset">Limpiar</button>
-              <button type="submit">Vender</button>
+              <button type="reset" disabled={loading}>Limpiar</button>
+              <button type="submit" disabled={loading}>Vender</button>
             </div>
           </form>
         </section>
