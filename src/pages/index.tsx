@@ -3,6 +3,8 @@ import localFont from "next/font/local";
 import { useSwipeable } from 'react-swipeable';
 import { ChangeEvent, FormEvent, ReactNode, useEffect, useState } from "react";
 import { collection, doc, onSnapshot, setDoc } from "firebase/firestore";
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -32,7 +34,6 @@ interface TicketDto {
 
 export default function Home() {
   const [loading, setLoading] = useState<boolean>(true);
-  const [hiddenSold, setHiddenSold] = useState(true);
   const [soldTickets, setSoldTickets] = useState<Array<number>>([]);
   const [tickets, setTickets] = useState<Map<string, TicketType>>(new Map())
   const boletos = Array.from({ length: 100 }, (_, i) => i);
@@ -73,17 +74,14 @@ export default function Home() {
 
   return (
     <main {...handlers} className={`${geistSans.variable} ${geistMono.variable} select-none overflow-hidden flex flex-col justify-center items-center p-2 min-h-screen font-[family-name:var(--font-geist-sans)]`}>
+      <ToastContainer />
       <Sidebar open={isShowSideBar}>
-        <div>
-          <button onClick={() => setHiddenSold(!hiddenSold)}>{hiddenSold ? 'Mostrar' : 'Ocultar'} Vendidos</button>
-        </div>
+        
       </Sidebar>
       <div className="rounded-md border-4 border-[#fdf1b0]">
         <section className="flex justify-center flex-wrap gap-2 rounded-md p-2 border-4 border-[#6a012c] bg-[#fdf1b0]">
           {boletos.map((number) => {
-            if (!hiddenSold || !soldTickets.includes(number)) {
-              return <Item key={number}>{number}</Item>
-            }
+            return <Item sold={soldTickets.includes(number)} key={number}>{number}</Item>
           })}
         </section>
       </div>
@@ -97,15 +95,18 @@ export default function Home() {
   );
 }
 
-function Item({ children }: { children: ReactNode }) {
+function Item({ sold, children }: { sold?: boolean, children: ReactNode }) {
   return (
     <div className="flex flex-col justify-center items-center w-[30px] h-[30px] p-2 border-2 border-[#6a012c] rounded-full text-[#6a012c] font-bold">
-      {children}
+      <div className="relative flex flex-col justify-center items-center">
+        {sold && <span className="absolute bg-red-500 w-[20px] h-[20px] rounded-full opacity-80" />}
+        {children}
+      </div>
     </div>
   )
 }
 
-const Sidebar = ({ open, children }: { open: boolean, children: ReactNode }) => {
+const Sidebar = ({ open, children }: { open: boolean, children?: ReactNode }) => {
   const [formData, setFormData] = useState<TicketDto>({ id: '', buyer: '', phone: ''})
 
   async function handleSubmit(event: FormEvent) {
@@ -118,7 +119,9 @@ const Sidebar = ({ open, children }: { open: boolean, children: ReactNode }) => 
       paid: false
     })
 
-    setFormData({ ...formData, id: '' })
+    toast.success(`Numero registrado ${formData.id} a: ${formData.buyer}`, {
+      toastId: "ticketAdded"
+    });
   }
 
   function handleOnChangeInput(e: ChangeEvent<HTMLInputElement>) {
@@ -138,16 +141,13 @@ const Sidebar = ({ open, children }: { open: boolean, children: ReactNode }) => 
         }`}
     >
       <div className="flex flex-col h-full justify-between p-4">
-        <section>
-          <h2 className="text-2xl font-bold">Opciones Visuales</h2>
-          <div className="py-8">{children}</div>
-        </section>
+        {children}
         <section>
           <h2 className="text-2xl font-bold">Opciones</h2>
           <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
             <div className="form-control">
               Numero:
-              <input required type="number" min="0" max="99" placeholder="Ej: 5" name="id" onChange={handleOnChangeInput} />
+              <input required type="number" min={0} max={99} placeholder="Ej: 5" name="id" onChange={handleOnChangeInput} />
             </div>
             <div className="form-control">
               Comprador:
