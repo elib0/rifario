@@ -110,11 +110,13 @@ export default function Home() {
 }
 
 function ItemDetails({ open, item, onClickClose }: { open: boolean, item?: TicketType, onClickClose?: () => void }) {
-  const [paid, setPaid] = useState(item?.paid || false);
+  const [paid, setPaid] = useState(false);
 
   useEffect(() => {
-    if (item && item.paid) setPaid(item.paid);
-  }, [item])
+    if (item) {
+      setPaid(item.paid);
+    }
+  }, [item, open])
   
   
   async function togglePaid() {
