@@ -101,7 +101,7 @@ export default function Home() {
         <article className="drop-shadow-lg p-2 rounded-xl bg-[#fdf1b0] text-[#6a012c] font-semibold">
           1x3$ y 2x5$
         </article>
-        <h3 className="flex flex-col justify-center items-center text-white text-sm drop-shadow-md bg-[#ffffff4b] px-4 rounded">Vendidos: {soldTickets.length} | Restantes: {100 - soldTickets.length}</h3>
+        <h3 className="flex flex-col justify-center items-center text-white text-sm drop-shadow-md bg-[#ffffff4b] px-4 rounded text-shadow">Vendidos: {soldTickets.length} | Restantes: {100 - soldTickets.length}</h3>
       </div>
 
       <ItemDetails open={isShowItemDetails} item={selectedItem} onClickClose={() => setShowItemDetails(false)} />
