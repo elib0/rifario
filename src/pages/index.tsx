@@ -20,6 +20,7 @@ const geistMono = localFont({
 const COLLECTION_NAME = 'sold';
 
 interface TicketType {
+  id?: number;
   buyer: string;
   paid: boolean;
   phone: string;
@@ -70,6 +71,7 @@ export default function Home() {
     
 
     if(ticket) {
+      ticket.id = index;
       selectItem(ticket);
       setShowItemDetails(true);
     }
@@ -87,9 +89,7 @@ export default function Home() {
   return (
     <main {...handlers} className={`${geistSans.variable} ${geistMono.variable} select-none overflow-hidden flex flex-col justify-center items-center p-2 min-h-screen font-[family-name:var(--font-geist-sans)]`}>
       <ToastContainer />
-      <Sidebar open={isShowSideBar}>
-        
-      </Sidebar>
+      <Sidebar open={isShowSideBar} />
       <div className="rounded-md border-4 border-[#fdf1b0]">
         <section className="flex justify-center flex-wrap gap-2 rounded-md p-2 border-4 border-[#6a012c] bg-[#fdf1b0]">
           {boletos.map((number) => {
@@ -110,22 +110,57 @@ export default function Home() {
 }
 
 function ItemDetails({ open, item, onClickClose }: { open: boolean, item?: TicketType, onClickClose?: () => void }) {
+  const [paid, setPaid] = useState(item?.paid || false);
+
+  useEffect(() => {
+    if (item && item.paid) setPaid(item.paid);
+  }, [item])
+  
+  
+  async function togglePaid() {
+    console.log(item);
+    
+    if(item && item.id) {
+      const docRef = doc(db, COLLECTION_NAME, item.id.toString());
+
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data() as TicketType;
+        await setDoc(docRef, {
+          paid: !data.paid
+        }, { merge: true })
+
+        setPaid(!data.paid)
+      }
+    }
+  }
+  
   if(!item) {
     return <></>
   }
 
   return (
     <div
-      className={`fixed p-4 bottom-0 left-0 w-full h-[50%] bg-[#6a012c] text-white transition-transform duration-300 ease-in-out z-50 ${open ? 'transform translate-y-0' : 'transform translate-y-full'
+      className={`fixed p-4 bottom-0 left-0 w-full h-[70%] bg-[#6a012c] text-white transition-transform duration-300 ease-in-out z-50 ${open ? 'transform translate-y-0' : 'transform translate-y-full'
         }`}
     >
-      <div className="flex flex-col justify-between h-full">
-        <div className="flex flex-col text-center text-xl md:text-3xl">
-          <span>Comprado por: {item.buyer}</span>
-          <span>N. Tlf: {item.phone || 'Sin registrar'}</span>
-          <span>Pagado: {item.paid ? 'Si' : 'No'}</span>
+      <div className="flex flex-col gap-3 justify-between items-center h-full">
+        <div className="flex flex-col text-center">
+          <div className="font-bold">Ticket #:</div>
+          <span className="text-xl">{item.id || '??'}</span>
+          <div><span className="font-bold">Comprado por:</span> {item.buyer}</div>
+          <div><span className="font-bold">N. Tlf:</span> {item.phone || 'Sin registrar'}</div>
         </div>
-        <button type='button' onClick={onClickClose}>Cerrar</button>
+        <div className="text-center">
+          <h1 className="text-xl font-bold">Pagado:</h1>
+          <span>click o tap en el botón de abajo para cambiar el estado</span>
+        </div>
+        <button onClick={togglePaid} className={`w-[150px] h-[150px] rounded-full flex flex-col justify-center items-center ${paid ? 'bg-green-500 text-white' : 'bg-white text-red'}`}>
+          {paid 
+            ? <svg xmlns="http://www.w3.org/2000/svg" width="75" height="75" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="icon icon-tabler icons-tabler-outline icon-tabler-check"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M5 12l5 5l10 -10" /></svg>
+            : <svg xmlns="http://www.w3.org/2000/svg" width="75" height="75" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="icon icon-tabler icons-tabler-outline icon-tabler-ban"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M5.7 5.7l12.6 12.6" /></svg>}
+        </button>
+        <button className="w-full" type='button' onClick={onClickClose}>Cerrar</button>
       </div>
     </div>
   )
